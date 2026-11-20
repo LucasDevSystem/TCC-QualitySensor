@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplicativo (demo) — QualitySensor</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #111111;
+    --muted: #555555;
+    --border: #cccccc;
+    --accent: #111111;
+    --accent-fg: #ffffff;
+    --danger: #a33;
+    --warn-bg: #fff6e0;
+    --warn-border: #e0c060;
+    --sensor-bg: #eef7ee;
+    --manual-bg: #f5f5f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --fg: #eeeeee;
+      --muted: #aaaaaa;
+      --border: #444444;
+      --accent: #eeeeee;
+      --accent-fg: #111111;
+      --danger: #e08080;
+      --warn-bg: #3a2f10;
+      --warn-border: #6b5620;
+      --sensor-bg: #16321a;
+      --manual-bg: #2a2a2a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 4rem;
+    line-height: 1.4;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 0.5rem; border-top: 1px solid var(--border); padding-top: 1.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+
+  .banner {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.88rem;
+    margin-bottom: 1.5rem;
+  }
+  .banner strong { display: block; margin-bottom: 0.15rem; }
+
+  .connect-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  #connect-status { font-size: 0.85rem; color: var(--muted); }
+
+  form { display: flex; flex-direction: column; gap: 0.75rem; max-width: 480px; }
+  label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+  label span.hint { color: var(--muted); font-size: 0.8rem; }
+  input, select {
+    font-size: 1rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: inherit;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  input:disabled { opacity: 0.65; background: var(--sensor-bg); }
+
+  .header-fields { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .header-fields label { flex: 1 1 180px; }
+
+  .pesos { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+  .peso-row { display: flex; align-items: center; gap: 0.6rem; }
+  .peso-row label { flex: 0 0 4.5rem; font-size: 0.9rem; }
+  .peso-row input { flex: 0 0 8rem; }
+  .peso-row .origem-label { font-size: 0.82rem; color: var(--muted); }
+
+  .warning {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 4px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.85rem;
+  }
+
+  .form-actions { display: flex; gap: 0.5rem; margin-top: 0.25rem; }
+  button {
+    font-size: 0.9rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 4px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-fg);
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--border);
+  }
+  button.link {
+    background: none;
+    border: none;
+    color: var(--fg);
+    text-decoration: underline;
+    padding: 0.1rem 0.3rem;
+    font-size: 0.85rem;
+  }
+  button.link.danger { color: var(--danger); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; }
+  tr.origem-sensor { background: var(--sensor-bg); }
+  tr.origem-manual { background: var(--manual-bg); }
+  .empty-row td { color: var(--muted); font-style: italic; white-space: normal; }
+  .actions-cell { display: flex; gap: 0.5rem; }
+  .edit-peso-input { width: 5.5rem; }
+
+  textarea {
+    width: 100%;
+    min-height: 8rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    resize: vertical;
+  }
+  .export-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+  #copy-feedback { font-size: 0.85rem; color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<h1>Aplicativo (demo) — QualitySensor</h1>
+<p class="subtitle">Formulário de simulação do app/site do cliente, para a demonstração do TCC.</p>
+
+<div class="banner">
+  <strong>Isto é uma simulação.</strong>
+  Não existe servidor real. "Enviar" grava os registros apenas no <code>localStorage</code>
+  deste navegador, neste computador. Não há rede, backend nem persistência entre dispositivos.
+</div>
+
+<div class="connect-bar">
+  <button type="button" id="connect-btn">Conectar sensor</button>
+  <span id="connect-status">desconectado</span>
+</div>
+<p class="subtitle">Requer o firmware com o canal de evento de pesagem (<code>tcc/14</code>) — sem ele, o seletor de dispositivo não encontrará o sensor.</p>
+
+<h2>Novo lote de pesagens</h2>
+
+<form id="batch-form">
+  <div class="header-fields">
+    <label for="f-analista">
+      Analista
+      <select id="f-analista">
+        <option value="" disabled selected>Selecione…</option>
+        <option value="Joao">João</option>
+        <option value="Cesar">Cesar</option>
+        <option value="Maria">Maria</option>
+      </select>
+    </label>
+    <label for="f-dataHora">
+      Data/Hora
+      <span class="hint">Preenchida automaticamente; vale para o lote inteiro.</span>
+      <input type="datetime-local" id="f-dataHora" required>
+    </label>
+  </div>
+
+  <div class="pesos" id="pesos-container">
+    <div class="peso-row">
+      <label for="f-peso-1">Peso 1</label>
+      <input type="text" inputmode="numeric" id="f-peso-1" autocomplete="off">
+      <span class="origem-label" id="origem-1">—</span>
+      <button type="button" class="link edit-peso-btn" id="edit-peso-1" style="display:none">Editar</button>
+    </div>
+    <div class="peso-row">
+      <label for="f-peso-2">Peso 2</label>
+      <input type="text" inputmode="numeric" id="f-peso-2" autocomplete="off">
+      <span class="origem-label" id="origem-2">—</span>
+      <button type="button" class="link edit-peso-btn" id="edit-peso-2" style="display:none">Editar</button>
+    </div>
+    <div class="peso-row">
+      <label for="f-peso-3">Peso 3</label>
+      <input type="text" inputmode="numeric" id="f-peso-3" autocomplete="off">
+      <span class="origem-label" id="origem-3">—</span>
+      <button type="button" class="link edit-peso-btn" id="edit-peso-3" style="display:none">Editar</button>
+    </div>
+    <div class="peso-row">
+      <label for="f-peso-4">Peso 4</label>
+      <input type="text" inputmode="numeric" id="f-peso-4" autocomplete="off">
+      <span class="origem-label" id="origem-4">—</span>
+      <button type="button" class="link edit-peso-btn" id="edit-peso-4" style="display:none">Editar</button>
+    </div>
+    <div class="peso-row">
+      <label for="f-peso-5">Peso 5</label>
+      <input type="text" inputmode="numeric" id="f-peso-5" autocomplete="off">
+      <span class="origem-label" id="origem-5">—</span>
+      <button type="button" class="link edit-peso-btn" id="edit-peso-5" style="display:none">Editar</button>
+    </div>
+  </div>
+
+  <div class="warning" id="form-warning" style="display:none"></div>
+
+  <div class="form-actions">
+    <button type="submit" id="submit-btn">Enviar</button>
+  </div>
+</form>
+
+<h2>Registros ("servidor" simulado)</h2>
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>Analista</th>
+      <th>Data/Hora</th>
+      <th>Peso</th>
+      <th>Origem</th>
+      <th>Seq</th>
+      <th>DeviceId</th>
+      <th>Editado</th>
+      <th>Ações</th>
+    </tr>
+  </thead>
+  <tbody id="records-tbody">
+  </tbody>
+</table>
+</div>
+
+<h2>Exportar para o Verificador</h2>
+<p class="subtitle">CSV <code>seq,peso</code>, uma linha por registro individual, da mais antiga para a mais recente. Linhas de registros manuais ficam com o campo <code>seq</code> vazio.</p>
+<textarea id="csv-output" readonly></textarea>
+<div class="export-actions">
+  <button type="button" class="secondary" id="copy-csv-btn">Copiar</button>
+  <span id="copy-feedback"></span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORAGE_KEY = 'qs_demo_records';
+  var PESO_COUNT = 5;
+
+  var connectBtn = document.getElementById('connect-btn');
+  var connectStatus = document.getElementById('connect-status');
+  var form = document.getElementById('batch-form');
+  var fAnalista = document.getElementById('f-analista');
+  var fDataHora = document.getElementById('f-dataHora');
+  var formWarning = document.getElementById('form-warning');
+  var tbody = document.getElementById('records-tbody');
+  var csvOutput = document.getElementById('csv-output');
+  var copyCsvBtn = document.getElementById('copy-csv-btn');
+  var copyFeedback = document.getElementById('copy-feedback');
+
+  var pesoInputs = [];
+  var origemLabels = [];
+  var editPesoBtns = [];
+  var pesoMeta = []; // {seq, deviceId} or null, one per peso field, index 0..4
+  for (var i = 0; i < PESO_COUNT; i++) {
+    pesoInputs.push(document.getElementById('f-peso-' + (i + 1)));
+    origemLabels.push(document.getElementById('origem-' + (i + 1)));
+    editPesoBtns.push(document.getElementById('edit-peso-' + (i + 1)));
+    pesoMeta.push(null);
+  }
+
+  var editingRecordId = null;
+
+  function loadRecords() {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    try {
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRecords(records) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function nowLocalDatetimeValue() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function nowLocalIso() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  function dataHoraFieldToIso(value) {
+    if (!value) return null;
+    return value.length === 16 ? value + ':00' : value;
+  }
+
+  function formatDisplayDate(localIso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(localIso || '');
+    if (!m) return localIso || '';
+    return m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] + ':' + m[5];
+  }
+
+  function showWarning(text) {
+    formWarning.textContent = text;
+    formWarning.style.display = 'block';
+  }
+
+  function clearWarning() {
+    formWarning.style.display = 'none';
+    formWarning.textContent = '';
+  }
+
+  // Um campo preenchido pelo sensor fica travado (disabled) — evidencia visualmente
+  // que aquele valor é confiável/auditável, e evita edição acidental. O botão
+  // "Editar" destrava; a edição em si (evento 'input' real) já derruba o metadado
+  // para "manual", no listener abaixo — travar de novo depois não é necessário.
+  function updateOrigemLabel(i) {
+    var val = pesoInputs[i].value.trim();
+    if (!val) {
+      origemLabels[i].textContent = '—';
+      pesoInputs[i].disabled = false;
+      editPesoBtns[i].style.display = 'none';
+    } else if (pesoMeta[i]) {
+      origemLabels[i].textContent = 'sensor (seq ' + pesoMeta[i].seq + ', device ' + pesoMeta[i].deviceId + ')';
+      pesoInputs[i].disabled = true;
+      editPesoBtns[i].style.display = '';
+    } else {
+      origemLabels[i].textContent = 'manual';
+      pesoInputs[i].disabled = false;
+      editPesoBtns[i].style.display = 'none';
+    }
+  }
+
+  // A keystroke (or paste) fires the native 'input' event; assigning .value
+  // programmatically (as receiveSensorEvent does) does not — that distinction
+  // is what lets a field lose its sensor metadata the moment a human edits it.
+  pesoInputs.forEach(function (input, i) {
+    input.addEventListener('input', function () {
+      pesoMeta[i] = null;
+      updateOrigemLabel(i);
+    });
+  });
+
+  editPesoBtns.forEach(function (btn, i) {
+    btn.addEventListener('click', function () {
+      pesoInputs[i].disabled = false;
+      editPesoBtns[i].style.display = 'none';
+      pesoInputs[i].focus();
+      pesoInputs[i].select();
+    });
+  });
+
+  function receiveSensorEvent(seq, deviceId, pesoStr) {
+    var idx = pesoInputs.findIndex(function (input) { return input.value.trim() === ''; });
+    if (idx === -1) {
+      showWarning('Todos os 5 campos já preenchidos — evento do sensor descartado.');
+      return;
+    }
+    pesoInputs[idx].value = pesoStr;
+    pesoMeta[idx] = { seq: seq, deviceId: deviceId };
+    updateOrigemLabel(idx);
+
+    // Avanca o foco para o proximo campo vazio, para acompanhar visualmente
+    // o preenchimento sequencial (o campo que acabou de ser preenchido fica
+    // disabled, entao nao pode mais reter o foco de qualquer forma).
+    var nextIdx = pesoInputs.findIndex(function (input) { return input.value.trim() === ''; });
+    if (nextIdx !== -1) {
+      pesoInputs[nextIdx].focus();
+    }
+  }
+  window.__qsReceiveSensorEvent = receiveSensorEvent;
+
+  // Canal de evento de pesagem (tcc/14 §2, §5) — serviço/característica fixos do firmware.
+  var WEIGHING_SERVICE_UUID = 'a07f0300-fc62-4f8a-b562-e0f333274f1d';
+  var WEIGHING_CHAR_UUID = 'a07f0301-fc62-4f8a-b562-e0f333274f1d';
+
+  var bleDevice = null;
+
+  function formatWeighingValue(val, dec) {
+    var sign = val < 0 ? '-' : '';
+    var digits = Math.abs(val).toString();
+    while (digits.length <= dec) digits = '0' + digits;
+    if (dec === 0) return sign + digits;
+    return sign + digits.slice(0, digits.length - dec) + '.' + digits.slice(digits.length - dec);
+  }
+
+  function onWeighingNotification(event) {
+    var raw = new TextDecoder().decode(event.target.value);
+    var evt;
+    try {
+      evt = JSON.parse(raw);
+    } catch (e) {
+      return;
+    }
+    receiveSensorEvent(evt.seq, evt.deviceId, formatWeighingValue(evt.val, evt.dec));
+  }
+
+  function handleGattDisconnected() {
+    // Only a teardown of a fully-established connection should overwrite the
+    // status text — a disconnect fired to clean up a failed setup attempt (see
+    // connectSensor's catch) must leave that attempt's error message on screen.
+    var wasConnected = !!bleDevice;
+    bleDevice = null;
+    connectBtn.disabled = false;
+    connectBtn.textContent = 'Conectar sensor';
+    if (wasConnected) {
+      connectStatus.textContent = 'desconectado';
+    }
+  }
+
+  function forgetBleDevice(device) {
+    // uma falha de gatt.connect() pode deixar o Chrome com a permissão presa a um
+    // dispositivo que não conecta mais (bond antigo no SO); esquecer força uma
+    // seleção nova da próxima vez, em vez de tentar reusar o mesmo dispositivo
+    if (device && typeof device.forget === 'function') {
+      device.forget().catch(function () {
+        // pode já não estar mais na lista de dispositivos autorizados
+      });
+    }
+  }
+
+  function connectSensor() {
+    if (!navigator.bluetooth) {
+      connectStatus.textContent = 'Web Bluetooth não disponível neste navegador (use Chrome/Edge, em HTTPS ou localhost).';
+      return;
+    }
+    connectBtn.disabled = true; // evita requestDevice() concorrente por duplo clique
+    connectStatus.textContent = 'abrindo seletor de dispositivo…';
+    var pendingDevice = null;
+    navigator.bluetooth.requestDevice({
+      // sem filtro por serviço: o firmware não anuncia o UUID no pacote de
+      // advertising (limite de 31B), então a busca lista todos os dispositivos
+      // próximos e a escolha é manual, pelo nome
+      acceptAllDevices: true,
+      optionalServices: [WEIGHING_SERVICE_UUID],
+    })
+      .then(function (device) {
+        pendingDevice = device;
+        console.log('[BLE] dispositivo selecionado:', device.name || device.id);
+        connectStatus.textContent = 'conectando a ' + (device.name || device.id) + '…';
+        device.addEventListener('gattserverdisconnected', handleGattDisconnected);
+        console.log('[BLE] gatt.connect()...');
+        return device.gatt.connect().then(function (server) {
+          console.log('[BLE] gatt.connect() ok');
+          return server.getPrimaryService(WEIGHING_SERVICE_UUID);
+        }).then(function (service) {
+          console.log('[BLE] getPrimaryService() ok');
+          return service.getCharacteristic(WEIGHING_CHAR_UUID);
+        }).then(function (characteristic) {
+          characteristic.addEventListener('characteristicvaluechanged', onWeighingNotification);
+          return characteristic.startNotifications();
+        }).then(function () {
+          console.log('[BLE] notificações ativadas');
+          bleDevice = device;
+          connectBtn.disabled = false;
+          connectBtn.textContent = 'Desconectar';
+          connectStatus.textContent = 'conectado a ' + (device.name || device.id);
+        });
+      })
+      .catch(function (err) {
+        console.error('[BLE] falha ao conectar:', err);
+        // Se a conexão GATT chegou a abrir mas uma etapa seguinte falhou (ex.:
+        // characteristic ainda não existe no firmware), fecha para não deixar
+        // uma conexão órfã ocupando o slot (CONFIG_BT_MAX_CONN=2, tcc/14 T4).
+        if (pendingDevice && pendingDevice.gatt && pendingDevice.gatt.connected) {
+          pendingDevice.gatt.disconnect();
+        }
+        connectBtn.disabled = false;
+        if (err && err.name === 'NotFoundError') {
+          connectStatus.textContent = 'nenhum dispositivo selecionado';
+          return;
+        }
+        forgetBleDevice(pendingDevice);
+        var errMsg = String(err && err.message ? err.message : err).replace(/\.+$/, '');
+        connectStatus.textContent = 'erro ao conectar: ' + errMsg + '. dispositivo esquecido, tente conectar de novo';
+      });
+  }
+
+  function disconnectSensor() {
+    if (bleDevice && bleDevice.gatt.connected) {
+      bleDevice.gatt.disconnect(); // dispara 'gattserverdisconnected' -> handleGattDisconnected()
+    }
+  }
+
+  connectBtn.addEventListener('click', function () {
+    if (bleDevice) {
+      disconnectSensor();
+    } else {
+      connectSensor();
+    }
+  });
+
+  function resetBatchForm() {
+    fAnalista.value = '';
+    fDataHora.value = nowLocalDatetimeValue();
+    for (var i = 0; i < PESO_COUNT; i++) {
+      pesoInputs[i].value = '';
+      pesoMeta[i] = null;
+      updateOrigemLabel(i);
+    }
+    clearWarning();
+    pesoInputs[0].focus();
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    if (!fAnalista.value) {
+      showWarning('Selecione o Analista antes de enviar.');
+      return;
+    }
+
+    var filled = [];
+    for (var i = 0; i < PESO_COUNT; i++) {
+      if (pesoInputs[i].value.trim() !== '') filled.push(i);
+    }
+    if (filled.length === 0) {
+      showWarning('Preencha pelo menos um peso antes de enviar.');
+      return;
+    }
+    clearWarning();
+
+    var records = loadRecords();
+    var analista = fAnalista.value;
+    var dataHoraIso = dataHoraFieldToIso(fDataHora.value);
+    var batchTs = Date.now();
+
+    filled.forEach(function (i) {
+      var meta = pesoMeta[i];
+      records.push({
+        id: 'r-' + batchTs + '-' + (i + 1),
+        analista: analista,
+        dataHora: dataHoraIso,
+        peso: pesoInputs[i].value.trim(),
+        seq: meta ? meta.seq : null,
+        deviceId: meta ? meta.deviceId : null,
+        origem: meta ? 'sensor' : 'manual',
+        criadoEm: nowLocalIso(),
+        editadoEm: null,
+        pesoOriginal: null
+      });
+    });
+
+    saveRecords(records);
+    resetBatchForm();
+    render();
+  }
+
+  function startEditRecord(id) {
+    editingRecordId = id;
+    render();
+  }
+
+  function cancelEditRecord() {
+    editingRecordId = null;
+    render();
+  }
+
+  function saveEditRecord(id, newPeso) {
+    newPeso = newPeso.trim();
+    if (!newPeso) return;
+    var records = loadRecords();
+    var idx = records.findIndex(function (r) { return r.id === id; });
+    if (idx === -1) return;
+    var existing = records[idx];
+    if (existing.peso !== newPeso) {
+      records[idx] = Object.assign({}, existing, {
+        peso: newPeso,
+        editadoEm: nowLocalIso(),
+        pesoOriginal: (existing.pesoOriginal !== null && existing.pesoOriginal !== undefined)
+          ? existing.pesoOriginal
+          : existing.peso
+      });
+      saveRecords(records);
+    }
+    editingRecordId = null;
+    render();
+  }
+
+  function deleteRecord(id) {
+    if (!window.confirm('Excluir este registro? Esta ação não pode ser desfeita.')) return;
+    var records = loadRecords().filter(function (r) { return r.id !== id; });
+    saveRecords(records);
+    if (editingRecordId === id) editingRecordId = null;
+    render();
+  }
+
+  function buildCsv(records) {
+    var sorted = records.slice().sort(function (a, b) {
+      return a.criadoEm < b.criadoEm ? -1 : a.criadoEm > b.criadoEm ? 1 : 0;
+    });
+    return sorted.map(function (r) {
+      return (r.seq !== null && r.seq !== undefined ? r.seq : '') + ',' + r.peso;
+    }).join('\n');
+  }
+
+  function render() {
+    var records = loadRecords();
+    var sorted = records.slice().sort(function (a, b) {
+      return a.criadoEm < b.criadoEm ? 1 : a.criadoEm > b.criadoEm ? -1 : 0;
+    });
+
+    tbody.innerHTML = '';
+    if (sorted.length === 0) {
+      var emptyRow = document.createElement('tr');
+      emptyRow.className = 'empty-row';
+      var emptyCell = document.createElement('td');
+      emptyCell.colSpan = 8;
+      emptyCell.textContent = 'Nenhum registro ainda.';
+      emptyRow.appendChild(emptyCell);
+      tbody.appendChild(emptyRow);
+    }
+
+    sorted.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.className = r.origem === 'sensor' ? 'origem-sensor' : 'origem-manual';
+      var isEditing = editingRecordId === r.id;
+
+      var tdAnalista = document.createElement('td');
+      tdAnalista.textContent = r.analista;
+      tr.appendChild(tdAnalista);
+
+      var tdData = document.createElement('td');
+      tdData.textContent = formatDisplayDate(r.dataHora);
+      tr.appendChild(tdData);
+
+      var tdPeso = document.createElement('td');
+      var editInput = null;
+      if (isEditing) {
+        editInput = document.createElement('input');
+        editInput.type = 'text';
+        editInput.inputMode = 'numeric';
+        editInput.className = 'edit-peso-input';
+        editInput.value = r.peso;
+        tdPeso.appendChild(editInput);
+      } else {
+        tdPeso.textContent = r.peso;
+      }
+      tr.appendChild(tdPeso);
+
+      var tdOrigem = document.createElement('td');
+      tdOrigem.textContent = r.origem;
+      tr.appendChild(tdOrigem);
+
+      var tdSeq = document.createElement('td');
+      tdSeq.textContent = (r.seq !== null && r.seq !== undefined) ? r.seq : '—';
+      tr.appendChild(tdSeq);
+
+      var tdDevice = document.createElement('td');
+      tdDevice.textContent = (r.deviceId !== null && r.deviceId !== undefined) ? r.deviceId : '—';
+      tr.appendChild(tdDevice);
+
+      var tdEditado = document.createElement('td');
+      tdEditado.textContent = r.editadoEm ? ('sim (original: ' + r.pesoOriginal + ')') : 'não';
+      tr.appendChild(tdEditado);
+
+      var actionsTd = document.createElement('td');
+      actionsTd.className = 'actions-cell';
+
+      if (isEditing) {
+        var saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'link';
+        saveBtn.textContent = 'Salvar';
+        saveBtn.addEventListener('click', function () { saveEditRecord(r.id, editInput.value); });
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'link';
+        cancelBtn.textContent = 'Cancelar';
+        cancelBtn.addEventListener('click', cancelEditRecord);
+
+        actionsTd.appendChild(saveBtn);
+        actionsTd.appendChild(cancelBtn);
+      } else {
+        var editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'link';
+        editBtn.textContent = 'Editar';
+        editBtn.addEventListener('click', function () { startEditRecord(r.id); });
+
+        var deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'link danger';
+        deleteBtn.textContent = 'Excluir';
+        deleteBtn.addEventListener('click', function () { deleteRecord(r.id); });
+
+        actionsTd.appendChild(editBtn);
+        actionsTd.appendChild(deleteBtn);
+      }
+      tr.appendChild(actionsTd);
+
+      tbody.appendChild(tr);
+    });
+
+    csvOutput.value = buildCsv(records);
+  }
+
+  form.addEventListener('submit', handleSubmit);
+
+  copyCsvBtn.addEventListener('click', function () {
+    if (!csvOutput.value) {
+      copyFeedback.textContent = 'Nada para copiar.';
+      return;
+    }
+    navigator.clipboard.writeText(csvOutput.value).then(function () {
+      copyFeedback.textContent = 'Copiado.';
+      setTimeout(function () { copyFeedback.textContent = ''; }, 2000);
+    }, function () {
+      csvOutput.select();
+      copyFeedback.textContent = 'Não foi possível copiar automaticamente — texto selecionado, use Ctrl/Cmd+C.';
+    });
+  });
+
+  fDataHora.value = nowLocalDatetimeValue();
+  render();
+})();
+</script>
+
+</body>
+</html>

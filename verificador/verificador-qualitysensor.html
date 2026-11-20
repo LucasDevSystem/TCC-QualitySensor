@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificador QualitySensor</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card-bg: #ffffff;
+    --text: #1c2128;
+    --muted: #5b6472;
+    --border: #dde1e6;
+    --accent: #2563eb;
+    --accent-fg: #ffffff;
+    --ok: #1a7f37;
+    --ok-bg: #e6f6ea;
+    --warn: #9a6700;
+    --warn-bg: #fff6da;
+    --bad: #c1121f;
+    --bad-bg: #fde8e8;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216;
+      --card-bg: #171b21;
+      --text: #e6e9ef;
+      --muted: #9aa4b2;
+      --border: #2a2f37;
+      --accent: #4d8dff;
+      --accent-fg: #08111f;
+      --ok: #4ada80;
+      --ok-bg: #10281a;
+      --warn: #e0b23a;
+      --warn-bg: #2b2308;
+      --bad: #ff6b6b;
+      --bad-bg: #2b1414;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 0.92rem; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 1.02rem; margin: 0 0 12px; }
+  .card h2 .step { color: var(--muted); font-weight: 400; }
+  label { display: block; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px; }
+  input[type="password"], input[type="text"], textarea {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  textarea { resize: vertical; min-height: 90px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  button {
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:not(:disabled):hover { filter: brightness(0.96); }
+  .status-line { font-size: 0.88rem; margin-top: 10px; }
+  .status-line.ok { color: var(--ok); }
+  .status-line.error { color: var(--bad); }
+  .status-line.pending { color: var(--muted); }
+  .banner {
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+    border: 1px solid var(--warn);
+    background: var(--warn-bg);
+    color: var(--warn);
+  }
+  .banner.bad { border-color: var(--bad); background: var(--bad-bg); color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-family: var(--mono); }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
+  .table-scroll { overflow-x: auto; max-height: 340px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  tr.row-ok td.integ { color: var(--ok); }
+  tr.row-bad td { background: var(--bad-bg); }
+  tr.row-bad td.integ { color: var(--bad); font-weight: 700; }
+  tr.row-unverified td.integ { color: var(--muted); }
+  .verdict-panel { padding: 14px 16px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; }
+  .verdict-panel.ok { background: var(--ok-bg); color: var(--ok); }
+  .verdict-panel.bad { background: var(--bad-bg); color: var(--bad); }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .stat-box .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+  .stat-box .value { font-size: 1.15rem; font-weight: 700; font-family: var(--mono); }
+  .verdict-tag { font-size: 0.82rem; font-weight: 700; }
+  .verdict-tag.ok { color: var(--ok); }
+  .verdict-tag.warn { color: var(--warn); }
+  .verdict-tag.bad { color: var(--bad); }
+  details.log { font-size: 0.8rem; color: var(--muted); }
+  details.log summary { cursor: pointer; font-weight: 600; }
+  pre.raw-log {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .hint { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Verificador QualitySensor</h1>
+  <p class="subtitle">Verificação da cadeia de auditoria HMAC-SHA256 via Bluetooth. Sem instalação.</p>
+
+  <div id="unsupportedBanner" class="banner bad" hidden></div>
+
+  <div class="card">
+    <h2><span class="step">1.</span> Conectar</h2>
+    <div class="row">
+      <button id="connectBtn" class="primary">Conectar</button>
+    </div>
+    <p class="hint">O seletor do navegador lista todos os dispositivos Bluetooth próximos (o sensor não anuncia o serviço no pacote de advertising). Procure e escolha manualmente o <code>Quality_Sensor...</code> na lista.</p>
+    <div id="connStatus" class="status-line pending">Não conectado.</div>
+  </div>
+
+  <div class="card" id="actionsSection" hidden>
+    <h2><span class="step">2.</span> Comando</h2>
+    <label for="keyInput">Chave K (hex)</label>
+    <input type="password" id="keyInput" placeholder="ex.: 4f6a1c...">
+    <p class="hint">A chave não é salva pela página. Cole-a novamente a cada sessão. Necessária apenas para Auditar.</p>
+    <div class="row">
+      <button id="dumpBtn" class="primary">Auditar (dump)</button>
+      <button id="statusBtn">Status</button>
+    </div>
+    <div id="actionStatus" class="status-line pending"></div>
+  </div>
+
+  <div class="card" id="statusSection" hidden>
+    <h2>Status do dispositivo</h2>
+    <div class="stat-grid" id="statGrid"></div>
+  </div>
+
+  <div class="card" id="tableSection" hidden>
+    <h2>Registros recebidos</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>#</th><th>seq</th><th>uptime (sem RTC)</th><th>valor</th><th>status</th><th>ver</th><th>hmac</th><th>integridade</th></tr>
+        </thead>
+        <tbody id="recordsBody"></tbody>
+      </table>
+    </div>
+    <div id="verdictPanel" class="verdict-panel" style="margin-top:14px;" hidden></div>
+  </div>
+
+  <div class="card" id="reconcileSection" hidden>
+    <h2>Reconciliar com o servidor</h2>
+    <p class="hint">Cole uma linha por registro em disputa, no formato <code>seq,valor</code> (ou <code>,valor</code> para uma entrada manual sem seq correspondente).</p>
+    <textarea id="reconcileInput" placeholder="42,137.50&#10;43,140.00&#10;,99.90"></textarea>
+    <div class="row">
+      <button id="reconcileBtn" class="primary">Reconciliar</button>
+    </div>
+    <div id="reconcileWarnBanner" class="banner bad" style="margin-top:12px;" hidden></div>
+    <div class="table-scroll" id="reconcileTableWrap" style="margin-top:12px;" hidden>
+      <table>
+        <thead>
+          <tr><th>entrada colada</th><th>seq (dispositivo)</th><th>valor (dispositivo)</th><th>veredito</th></tr>
+        </thead>
+        <tbody id="reconcileBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="exportSection" hidden>
+    <h2>Exportar relatório</h2>
+    <div class="row">
+      <button id="exportJsonBtn">Exportar JSON</button>
+      <button id="exportCsvBtn">Exportar CSV</button>
+    </div>
+    <p class="hint">Dentro do preview de um Artifact, o download é bloqueado pelo sandbox. Funciona normalmente ao abrir este arquivo diretamente ou hospedado fora dele.</p>
+  </div>
+
+  <div class="card">
+    <details class="log" id="techLogDetails">
+      <summary>Log técnico (conexão e dados recebidos)</summary>
+      <pre class="raw-log" id="rawLog"></pre>
+    </details>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const SVC_UUID = 'a07f0200-fc62-4f8a-b562-e0f333274f1d';
+const CMD_UUID = 'a07f0201-fc62-4f8a-b562-e0f333274f1d';
+const DAT_UUID = 'a07f0202-fc62-4f8a-b562-e0f333274f1d';
+const CMD_DUMP = 0xA1;
+const CMD_STATUS = 0xA2;
+const GENESIS = new TextEncoder().encode('QS-AUDIT-GENESIS-v1');
+
+// FEATURE: correcao pos-parecer-de-banca (achado C3) - a genese da cadeia agora e
+// amarrada ao deviceId do firmware (audit_chain.c: H0 = HMAC(K, semente || deviceId
+// little-endian)). O deviceId sao os mesmos 2 bytes do endereco de fabrica ja
+// exibidos no nome anunciado (ex.: "Quality_SensorA3:F2" -> 0xA3F2 -> 41970),
+// entao da para extrai-lo do proprio `device.name`, sem nenhum servico GATT novo.
+function deviceIdFromName(name) {
+  if (!name) return null;
+  const m = /([0-9A-Fa-f]{1,2}):([0-9A-Fa-f]{1,2})\s*$/.exec(name);
+  if (!m) return null;
+  const mac1 = parseInt(m[1], 16);
+  const mac0 = parseInt(m[2], 16);
+  return ((mac1 << 8) | mac0) & 0xffff;
+}
+function deviceIdBytesLE(deviceId) {
+  return new Uint8Array([deviceId & 0xff, (deviceId >> 8) & 0xff]);
+}
+
+function hexToBytes(hex) {
+  const clean = hex.trim();
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
+  return out;
+}
+function bytesToHex(bytes) {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+function concatBytes(...arrs) {
+  const out = new Uint8Array(arrs.reduce((n, a) => n + a.length, 0));
+  let off = 0;
+  for (const a of arrs) { out.set(a, off); off += a.length; }
+  return out;
+}
+function bytesEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+// espelha struct qs_audit_entry (20 bytes, little-endian) do firmware
+function serializeRn(r) {
+  const buf = new ArrayBuffer(20);
+  const dv = new DataView(buf);
+  dv.setBigUint64(0, BigInt(Math.trunc(r.ts)), true);
+  dv.setUint32(8, r.seq >>> 0, true);
+  dv.setInt32(12, r.val | 0, true);
+  dv.setUint8(16, r.dec & 0xff);
+  dv.setUint8(17, r.st & 0xff);
+  dv.setUint16(18, (r.ver ?? 1) & 0xffff, true);
+  return new Uint8Array(buf);
+}
+
+async function importHmacKey(keyBytes) {
+  return crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+}
+async function hmacSha256(cryptoKey, data) {
+  return new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, data));
+}
+
+async function verifyChain(records, keyHex, deviceId) {
+  const key = await importHmacKey(hexToBytes(keyHex));
+  // Se o deviceId nao pode ser extraido do nome anunciado (dispositivo renomeado,
+  // nome indisponivel), cai de volta para a genese sem deviceId - so funciona
+  // contra firmware anterior a esta correcao; fica registrado no log tecnico.
+  const genesisInput = (deviceId === null || deviceId === undefined)
+    ? GENESIS
+    : concatBytes(GENESIS, deviceIdBytesLE(deviceId));
+  let head = await hmacSha256(key, genesisInput);
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const expected = await hmacSha256(key, concatBytes(head, serializeRn(r)));
+    const stored = hexToBytes(r.hmac);
+    if (!bytesEqual(expected, stored)) {
+      return { ok: false, brokenIndex: i, badSeq: r.seq, count: records.length };
+    }
+    head = stored;
+  }
+  return { ok: true, brokenIndex: null, badSeq: null, count: records.length };
+}
+
+const state = {
+  device: null,
+  deviceId: null,
+  cmdChar: null,
+  dataChar: null,
+  connected: false,
+  buffer: '',
+  keyHex: '',
+  lastCommand: null,
+  records: [],
+  recordsBySeq: new Map(),
+  chainResult: null,
+  statusInfo: null,
+  lastReconciliation: null,
+};
+
+const els = {};
+['keyInput','connectBtn','connStatus','unsupportedBanner','actionsSection','dumpBtn','statusBtn',
+ 'actionStatus','statusSection','statGrid','tableSection','recordsBody','verdictPanel',
+ 'reconcileSection','reconcileInput','reconcileBtn','reconcileWarnBanner','reconcileTableWrap','reconcileBody',
+ 'exportSection','exportJsonBtn','exportCsvBtn','rawLog','techLogDetails'
+].forEach((id) => { els[id] = document.getElementById(id); });
+
+function checkPlatformSupport() {
+  if (!('bluetooth' in navigator)) {
+    els.unsupportedBanner.hidden = false;
+    els.unsupportedBanner.textContent =
+      'Web Bluetooth não é suportado neste navegador. Use Google Chrome, Microsoft Edge ou Opera ' +
+      'em um computador, ou Google Chrome no Android. Safari (macOS e iOS) não é compatível.';
+    els.connectBtn.disabled = true;
+    return false;
+  }
+  if (!window.isSecureContext) {
+    els.unsupportedBanner.hidden = false;
+    els.unsupportedBanner.textContent =
+      'Esta página precisa ser aberta via HTTPS ou http://localhost para usar Bluetooth.';
+    els.connectBtn.disabled = true;
+    return false;
+  }
+  return true;
+}
+
+function logRaw(line) {
+  const ts = new Date().toLocaleTimeString('pt-BR');
+  els.rawLog.textContent += `[${ts}] ${line}\n`;
+  els.rawLog.scrollTop = els.rawLog.scrollHeight;
+}
+
+function logError(context, err) {
+  console.error(`[${context}]`, err);
+  logRaw(`ERRO em ${context}: nome=${err?.name || '?'} mensagem=${err?.message || err}`);
+  els.techLogDetails.open = true;
+}
+
+function cleanErrMsg(err) {
+  return String(err?.message || err).replace(/\.+$/, '');
+}
+
+function setConnStatus(msg, kind) {
+  els.connStatus.textContent = msg;
+  els.connStatus.className = 'status-line ' + (kind || '');
+}
+
+async function handleConnect() {
+  if (state.device && state.device.gatt && !state.connected) {
+    setConnStatus(`Reconectando a ${state.device.name || '(sem nome)'}...`, 'pending');
+    logRaw(`reconectando a ${state.device.name || '(sem nome)'} (id=${state.device.id || '?'})`);
+    try {
+      await gattConnect(state.device);
+    } catch (err) {
+      logError('reconexão GATT', err);
+      await forgetDevice();
+      setConnStatus(`Falha ao reconectar: ${cleanErrMsg(err)}. Dispositivo esquecido, clique em Conectar de novo para selecionar.`, 'error');
+    }
+    return;
+  }
+
+  let device;
+  try {
+    setConnStatus('Selecionando dispositivo (verifique o seletor do navegador)...', 'pending');
+    // o sensor não anuncia o UUID do serviço no advertising, então a busca
+    // não pode ser filtrada por serviço; lista tudo e a escolha é manual, pelo nome
+    device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [SVC_UUID],
+    });
+    logRaw(`dispositivo selecionado: ${device.name || '(sem nome)'} (id=${device.id || '?'})`);
+  } catch (err) {
+    if (err.name === 'NotFoundError') {
+      setConnStatus('Nenhum dispositivo selecionado.', 'pending');
+    } else {
+      logError('requestDevice', err);
+      setConnStatus(`Falha ao selecionar dispositivo: ${cleanErrMsg(err)}`, 'error');
+    }
+    return;
+  }
+
+  state.device = device;
+  state.deviceId = deviceIdFromName(device.name);
+  logRaw(state.deviceId !== null
+    ? `deviceId extraido do nome: ${state.deviceId}`
+    : 'nao foi possivel extrair o deviceId do nome anunciado - genese sem amarracao ao dispositivo');
+  device.addEventListener('gattserverdisconnected', onDisconnected);
+  try {
+    await gattConnect(device);
+  } catch (err) {
+    logError('conexão GATT', err);
+    await forgetDevice();
+    setConnStatus(`Falha ao conectar: ${cleanErrMsg(err)}. Dispositivo esquecido, clique em Conectar de novo para selecionar.`, 'error');
+  }
+}
+
+async function forgetDevice() {
+  const device = state.device;
+  state.device = null;
+  state.connected = false;
+  if (device && typeof device.forget === 'function') {
+    try {
+      await device.forget();
+      logRaw(`dispositivo ${device.name || '(sem nome)'} esquecido (permissão do site revogada)`);
+    } catch (e) {
+      logRaw(`forget() falhou (pode já não estar na lista): ${e.message || e}`);
+    }
+  }
+}
+
+async function gattConnect(device) {
+  setConnStatus(`Conectando a ${device.name || '(sem nome)'}...`, 'pending');
+  logRaw('gatt.connect()...');
+  const server = await device.gatt.connect();
+  logRaw('gatt.connect() ok');
+  logRaw('getPrimaryService()...');
+  const service = await server.getPrimaryService(SVC_UUID);
+  logRaw('getPrimaryService() ok');
+  state.cmdChar = await service.getCharacteristic(CMD_UUID);
+  state.dataChar = await service.getCharacteristic(DAT_UUID);
+  logRaw('características obtidas');
+  await state.dataChar.startNotifications();
+  logRaw('notificações ativadas');
+  state.dataChar.addEventListener('characteristicvaluechanged', onDataNotify);
+  state.connected = true;
+  setConnStatus(`Conectado a ${device.name || '(sem nome)'}`, 'ok');
+  els.connectBtn.textContent = 'Conectado';
+  els.connectBtn.disabled = true;
+  els.actionsSection.hidden = false;
+}
+
+function onDisconnected() {
+  state.connected = false;
+  logRaw(`gattserverdisconnected: ${state.device?.name || 'dispositivo'}`);
+  setConnStatus(`Desconectado de ${state.device?.name || 'dispositivo'}. Clique em Conectar para tentar de novo.`, 'error');
+  els.connectBtn.textContent = 'Conectar';
+  els.connectBtn.disabled = false;
+  els.actionsSection.hidden = true;
+}
+
+function onDataNotify(ev) {
+  const chunk = new TextDecoder().decode(ev.target.value);
+  state.buffer += chunk;
+  let idx;
+  while ((idx = state.buffer.indexOf('\n')) >= 0) {
+    const line = state.buffer.slice(0, idx);
+    state.buffer = state.buffer.slice(idx + 1);
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    logRaw(trimmed);
+    let obj;
+    try {
+      obj = JSON.parse(trimmed);
+    } catch (e) {
+      logRaw(`[erro ao interpretar linha: ${e.message}]`);
+      continue;
+    }
+    handleMessage(obj);
+  }
+}
+
+function handleMessage(obj) {
+  if (obj.end) {
+    onStreamEnd(obj);
+    return;
+  }
+  if (state.lastCommand === 'dump') {
+    state.records.push(obj);
+    if (obj.seq !== undefined) state.recordsBySeq.set(obj.seq, obj);
+    appendRecordRow(obj, state.records.length - 1);
+  }
+}
+
+async function onStreamEnd(obj) {
+  if (state.lastCommand === 'dump') {
+    setActionStatus(`Recebidos ${state.records.length} registros. Verificando cadeia...`, 'pending');
+    const result = await verifyChain(state.records, state.keyHex, state.deviceId);
+    state.chainResult = result;
+    renderVerdict(result);
+    markRowIntegrity(result);
+    setActionStatus(`Verificação concluída: ${state.records.length} registros.`, 'ok');
+    els.reconcileSection.hidden = false;
+    els.exportSection.hidden = false;
+  } else if (state.lastCommand === 'status') {
+    state.statusInfo = obj;
+    renderStatus(obj);
+    setActionStatus('Status recebido.', 'ok');
+    els.exportSection.hidden = false;
+  }
+}
+
+function setActionStatus(msg, kind) {
+  els.actionStatus.textContent = msg;
+  els.actionStatus.className = 'status-line ' + (kind || '');
+}
+
+function resetForNewCommand(cmdName) {
+  state.lastCommand = cmdName;
+  state.buffer = '';
+  state.records = [];
+  state.recordsBySeq = new Map();
+  state.chainResult = null;
+  state.statusInfo = null;
+  state.lastReconciliation = null;
+
+  els.recordsBody.innerHTML = '';
+  els.verdictPanel.hidden = true;
+  els.tableSection.hidden = cmdName !== 'dump';
+  els.statusSection.hidden = cmdName !== 'status';
+  els.reconcileSection.hidden = true;
+  els.reconcileTableWrap.hidden = true;
+  els.exportSection.hidden = true;
+  els.rawLog.textContent = '';
+}
+
+async function sendCommand(cmd, cmdName) {
+  if (!state.connected) return;
+  resetForNewCommand(cmdName);
+  setActionStatus(cmdName === 'dump' ? 'Solicitando cadeia de auditoria...' : 'Solicitando status...', 'pending');
+  try {
+    await state.cmdChar.writeValueWithoutResponse(new Uint8Array([cmd]));
+  } catch (err) {
+    setActionStatus(`Falha ao enviar comando: ${err.message}`, 'error');
+  }
+}
+
+function fmtValue(r) {
+  const dec = r.dec ?? 0;
+  return (r.val / Math.pow(10, dec)).toFixed(dec);
+}
+// FEATURE: correcao pos-parecer-de-banca (achado C6) - o campo `ts` do dispositivo
+// e uptime em MILISSEGUNDOS (sem RTC, ver limitacao declarada no artigo), nao
+// epoca Unix. A versao anterior fazia `new Date(ts * 1000)`, tratando uptime-ms
+// como se fosse segundos-epoca, e exibia datas fabricadas (ex.: anos 1970) num
+// relatorio que o proprio artigo recomenda como anexo de evidencia. Mostra o
+// uptime como o que ele e, sem fingir ser data/hora.
+function fmtTs(ts) {
+  const ms = Number(ts);
+  if (Number.isNaN(ms)) return String(ts);
+  return (ms / 1000).toFixed(3) + ' s (uptime, sem RTC)';
+}
+function shortHmac(hex) {
+  if (!hex) return '';
+  return hex.length > 12 ? hex.slice(0, 8) + '...' : hex;
+}
+
+function appendRecordRow(r, index) {
+  const tr = document.createElement('tr');
+  tr.dataset.index = String(index);
+  tr.innerHTML = `
+    <td>${index}</td>
+    <td>${r.seq}</td>
+    <td>${fmtTs(r.ts)}</td>
+    <td>${fmtValue(r)}</td>
+    <td>${r.st}</td>
+    <td>${r.ver ?? 1}</td>
+    <td title="${r.hmac || ''}">${shortHmac(r.hmac)}</td>
+    <td class="integ">...</td>
+  `;
+  els.recordsBody.appendChild(tr);
+}
+
+function markRowIntegrity(result) {
+  const rows = els.recordsBody.querySelectorAll('tr');
+  rows.forEach((tr) => {
+    const i = Number(tr.dataset.index);
+    const integCell = tr.querySelector('.integ');
+    tr.classList.remove('row-ok', 'row-bad', 'row-unverified');
+    if (result.brokenIndex === null || i < result.brokenIndex) {
+      tr.classList.add('row-ok');
+      integCell.textContent = 'ok';
+    } else if (i === result.brokenIndex) {
+      tr.classList.add('row-bad');
+      integCell.textContent = 'falha';
+    } else {
+      tr.classList.add('row-unverified');
+      integCell.textContent = 'não verificado';
+    }
+  });
+}
+
+function renderVerdict(result) {
+  els.verdictPanel.hidden = false;
+  if (result.ok) {
+    els.verdictPanel.className = 'verdict-panel ok';
+    els.verdictPanel.textContent = `Cadeia íntegra: ${result.count} registros verificados.`;
+  } else if (result.brokenIndex === 0) {
+    // Acha C1 do parecer de banca: uma quebra logo no 1o registro e ambigua -
+    // pode ser adulteracao real, mas tambem chave K digitada errada ou (desde a
+    // genese amarrada ao deviceId, ver verifyChain) dispositivo fisico errado
+    // conectado. A ferramenta nao tem como distinguir os tres sozinha; dizer
+    // isso e mais honesto do que apontar "adulteracao" com certeza que nao existe.
+    els.verdictPanel.className = 'verdict-panel bad';
+    els.verdictPanel.textContent =
+      `Cadeia não confere já no primeiro registro (seq=${result.badSeq}). Isso pode ser ` +
+      `adulteração real, mas também chave K digitada errada, ou dispositivo físico diferente ` +
+      `daquele que gerou esta cadeia. Confirme a chave e o dispositivo antes de concluir adulteração.`;
+  } else {
+    els.verdictPanel.className = 'verdict-panel bad';
+    els.verdictPanel.textContent = `Adulteração detectada no registro seq=${result.badSeq}.`;
+  }
+}
+
+function renderStatus(obj) {
+  els.statusSection.hidden = false;
+  const fields = [
+    ['count', 'Registros'],
+    ['used_bytes', 'Usado (bytes)'],
+    ['free_bytes', 'Livre (bytes)'],
+    ['total_bytes', 'Total (bytes)'],
+  ];
+  els.statGrid.innerHTML = fields.map(([key, label]) => `
+    <div class="stat-box">
+      <div class="label">${label}</div>
+      <div class="value">${obj[key] !== undefined ? obj[key] : '-'}</div>
+    </div>
+  `).join('');
+}
+
+function parsePastedLines(text) {
+  return text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0).map((line) => {
+    const parts = line.split(',');
+    const seqRaw = (parts[0] || '').trim();
+    const valueRaw = (parts[1] || '').trim();
+    return {
+      raw: line,
+      seqRaw,
+      seq: seqRaw === '' ? null : parseInt(seqRaw, 10),
+      value: valueRaw === '' ? null : parseFloat(valueRaw.replace(',', '.')),
+    };
+  });
+}
+
+function valuesMatch(deviceValue, pastedValue, dec) {
+  if (pastedValue === null || Number.isNaN(pastedValue)) return false;
+  const factor = Math.pow(10, dec ?? 0);
+  return Math.round(deviceValue * factor) === Math.round(pastedValue * factor);
+}
+
+function computeReconciliation(entries) {
+  const rows = [];
+  const matchedSeqs = new Set();
+  const brokenIndex = state.chainResult ? state.chainResult.brokenIndex : null;
+
+  for (const e of entries) {
+    if (e.seq === null || Number.isNaN(e.seq)) {
+      rows.push({ entry: e, deviceSeq: '-', deviceValue: '-', verdict: 'warn', label: 'Entrada manual: responsabilidade do usuário' });
+      continue;
+    }
+    const rec = state.recordsBySeq.get(e.seq);
+    if (!rec) {
+      rows.push({ entry: e, deviceSeq: '-', deviceValue: '-', verdict: 'warn', label: 'Não veio deste sensor (seq inexistente na cadeia)' });
+      continue;
+    }
+    matchedSeqs.add(e.seq);
+    const idx = state.records.indexOf(rec);
+    const chainOkHere = brokenIndex === null || idx < brokenIndex;
+    const deviceValue = fmtValue(rec);
+    if (!chainOkHere) {
+      rows.push({ entry: e, deviceSeq: rec.seq, deviceValue, verdict: 'bad', label: 'Falha/adulteração no dispositivo (cadeia quebra antes deste registro)' });
+      continue;
+    }
+    if (valuesMatch(rec.val / Math.pow(10, rec.dec ?? 0), e.value, rec.dec)) {
+      rows.push({ entry: e, deviceSeq: rec.seq, deviceValue, verdict: 'ok', label: 'Sem falha' });
+    } else {
+      rows.push({ entry: e, deviceSeq: rec.seq, deviceValue, verdict: 'warn', altered: true, label: 'Falha do usuário/app (valor alterado após a leitura)' });
+    }
+  }
+
+  state.records.forEach((rec, idx) => {
+    const chainOkHere = brokenIndex === null || idx < brokenIndex;
+    if (chainOkHere && rec.seq !== undefined && !matchedSeqs.has(rec.seq)) {
+      rows.push({
+        entry: { raw: '(não colado)' },
+        deviceSeq: rec.seq,
+        deviceValue: fmtValue(rec),
+        verdict: 'warn',
+        label: 'Falha de entrega (dado gerado, não confirmado no servidor)',
+      });
+    }
+  });
+
+  return rows;
+}
+
+function renderReconciliation(rows) {
+  els.reconcileTableWrap.hidden = rows.length === 0;
+  els.reconcileBody.innerHTML = rows.map((r) => `
+    <tr>
+      <td>${r.entry.raw}</td>
+      <td>${r.deviceSeq}</td>
+      <td>${r.deviceValue}</td>
+      <td class="verdict-tag ${r.verdict}">${r.label}</td>
+    </tr>
+  `).join('');
+
+  // Aviso explícito quando a reconciliação encontra registros com valor alterado
+  // após a leitura (seq/dispositivo confere, cadeia íntegra, valor diverge do
+  // servidor) ou com a própria cadeia do dispositivo rompida — os dois casos em
+  // que a auditoria detecta um problema real, e não só uma ausência de correlação
+  // (entrada manual / seq inexistente / falha de entrega já ficam sinalizados,
+  // com menor severidade, na coluna "veredito" de cada linha).
+  const altered = rows.filter((r) => r.altered);
+  const tampered = rows.filter((r) => r.verdict === 'bad');
+  if (altered.length > 0 || tampered.length > 0) {
+    const parts = [];
+    if (altered.length > 0) {
+      parts.push(`${altered.length} registro${altered.length > 1 ? 's' : ''} com valor alterado após a leitura ` +
+        `(seq confere, cadeia íntegra, valor diverge do servidor — falha do usuário/aplicação)`);
+    }
+    if (tampered.length > 0) {
+      parts.push(`${tampered.length} registro${tampered.length > 1 ? 's' : ''} com a cadeia do próprio ` +
+        `dispositivo rompida (possível adulteração no sensor)`);
+    }
+    els.reconcileWarnBanner.textContent = '⚠ ' + parts.join(' · ') + '.';
+    els.reconcileWarnBanner.hidden = false;
+  } else {
+    els.reconcileWarnBanner.hidden = true;
+  }
+}
+
+function handleReconcile() {
+  const entries = parsePastedLines(els.reconcileInput.value);
+  const rows = computeReconciliation(entries);
+  state.lastReconciliation = rows.map((r) => ({
+    entrada: r.entry.raw,
+    seqDispositivo: r.deviceSeq,
+    valorDispositivo: r.deviceValue,
+    veredito: r.label,
+  }));
+  renderReconciliation(rows);
+}
+
+function slug(name) {
+  return (name || 'dispositivo').replace(/[^a-zA-Z0-9_-]+/g, '-');
+}
+
+function buildReport() {
+  return {
+    geradoEm: new Date().toISOString(),
+    dispositivo: state.device ? state.device.name : null,
+    comando: state.lastCommand,
+    resultadoCadeia: state.chainResult,
+    status: state.statusInfo,
+    registros: state.records,
+    reconciliacao: state.lastReconciliation,
+  };
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportJson() {
+  const blob = new Blob([JSON.stringify(buildReport(), null, 2)], { type: 'application/json' });
+  triggerDownload(blob, `auditoria-${slug(state.device?.name)}-${Date.now()}.json`);
+}
+
+function csvEscape(v) {
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportCsv() {
+  const rows = [['seq', 'ts', 'val', 'dec', 'st', 'ver', 'hmac', 'integridade']];
+  state.records.forEach((r, i) => {
+    let integ = 'não verificado';
+    if (state.chainResult) {
+      const broken = state.chainResult.brokenIndex;
+      if (broken === null || i < broken) integ = 'ok';
+      else if (i === broken) integ = 'FALHA';
+      else integ = 'não verificado (cadeia já rompida)';
+    }
+    rows.push([r.seq, r.ts, r.val, r.dec, r.st, r.ver ?? 1, r.hmac, integ]);
+  });
+  const csv = rows.map((row) => row.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  triggerDownload(blob, `auditoria-${slug(state.device?.name)}-${Date.now()}.csv`);
+}
+
+els.connectBtn.addEventListener('click', handleConnect);
+els.dumpBtn.addEventListener('click', () => {
+  const keyHex = els.keyInput.value.trim();
+  if (!/^[0-9a-fA-F]+$/.test(keyHex) || keyHex.length % 2 !== 0 || keyHex.length === 0) {
+    setActionStatus('Chave K inválida. Informe um hexadecimal em pares de dígitos, ex.: 4f6a1c...', 'error');
+    return;
+  }
+  state.keyHex = keyHex;
+  sendCommand(CMD_DUMP, 'dump');
+});
+els.statusBtn.addEventListener('click', () => sendCommand(CMD_STATUS, 'status'));
+els.reconcileBtn.addEventListener('click', handleReconcile);
+els.exportJsonBtn.addEventListener('click', exportJson);
+els.exportCsvBtn.addEventListener('click', exportCsv);
+
+checkPlatformSupport();
+</script>
+</body>
+</html>
